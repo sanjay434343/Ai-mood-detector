@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎵 AI Mood Music</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <style>
+    :root {
+      --primary: #5E60CE;
+      --primary-dark: #4E54C8;
+      --secondary: #7400B8;
+      --accent: #48BFE3;
+      --accent-light: #80FFDB;
+      --text-light: #F8F9FA;
+      --text-dark: #212529;
+      --bg-dark: #121212;
+      --bg-light: #F8F9FA;
+      --card-bg: rgba(255, 255, 255, 0.95);
+      --card-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+      --gradient: linear-gradient(135deg, var(--primary), var(--secondary));
+      --gradient-accent: linear-gradient(135deg, var(--accent), var(--accent-light));
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+    
+    body {
+      background: var(--bg-light);
+      color: var(--text-dark);
+      min-height: 100vh;
+      overflow-x: hidden;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    }
+
+    .detection-phase {
+      position: fixed;
+      inset: 0;
+      background: var(--gradient);
+      color: var(--text-light);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.6s ease;
+    }
+
+    .detection-phase.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-100%);
+    }
+
+    .detection-title {
+      font-size: 2.5rem;
+      font-weight: 800;
+      margin-bottom: 2.5rem;
+      position: relative;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .detection-title::after {
+      content: '';
+      position: absolute;
+      bottom: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      height: 4px;
+      width: 60px;
+      background: var(--accent-light);
+      border-radius: 2px;
+    }
+
+    .camera-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.2);
+      color: var(--text-light);
+      border: none;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      font-size: 1.2rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .camera-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: scale(1.05);
+    }
+
+    .face-container {
+      position: relative;
+      width: 320px;
+      height: 320px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto;
+    }
+
+    .face-scan {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 280px;
+      height: 280px;
+      border: 3px solid var(--accent-light);
+      border-radius: 50%;
+      box-shadow: 
+        0 0 0 3px rgba(255, 255, 255, 0.2),
+        0 0 30px rgba(255, 255, 255, 0.3),
+        0 0 60px rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .scan-circle {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      background: radial-gradient(
+        circle at center,
+        transparent 30%,
+        rgba(128, 255, 219, 0.1) 70%,
+        rgba(128, 255, 219, 0.3) 90%
+      );
+      animation: pulse 2s infinite;
+    }
+
+    .scan-line {
+      position: absolute;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(90deg, transparent, var(--accent-light), transparent);
+      box-shadow: 0 0 20px var(--accent-light);
+      animation: scan 0.8s cubic-bezier(0.3, 0, 0.7, 1) infinite;
+    }
+
+    .scan-dots {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: 
+        radial-gradient(circle, var(--accent-light) 1px, transparent 1px) 0 0 / 20px 20px,
+        radial-gradient(circle, var(--accent-light) 1px, transparent 1px) 10px 10px / 20px 20px;
+      opacity: 0.3;
+      animation: rotate 20s linear infinite;
+    }
+
+    @keyframes scan {
+      0% { transform: translateY(-120px); opacity: 0; }
+      50% { opacity: 1; }
+      100% { transform: translateY(120px); opacity: 0; }
+    }
+
+    @keyframes rotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes pulse {
+      0% { transform: translate(-50%, -50%) scale(0.95); opacity: 0.7; }
+      50% { transform: translate(-50%, -50%) scale(1.05); opacity: 0.9; }
+      100% { transform: translate(-50%, -50%) scale(0.95); opacity: 0.7; }
+    }
+
+    #video {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      object-fit: cover;
+      width: 260px;
+      height: 260px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .detection-status {
+      position: relative;
+      margin-top: 30px;
+      text-align: center;
+      font-size: 1.1rem;
+      color: var(--text-light);
+      font-weight: 500;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 12px 25px;
+      border-radius: 50px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .loading {
+      position: relative;
+      padding-right: 28px;
+    }
+
+    .loading::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 50%;
+      width: 16px;
+      height: 16px;
+      margin-top: -8px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-top-color: var(--accent-light);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .main-app {
+      position: fixed;
+      inset: 0;
+      overflow-y: auto;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+      padding: 0;
+      z-index: 1;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    }
+
+    .main-app.visible {
+      opacity: 1;
+    }
+
+    .app-header {
+      background: var(--gradient);
+      color: var(--text-light);
+      padding: 1.5rem 0;
+      text-align: center;
+      position: relative;
+      border-bottom-left-radius: 40px;
+      border-bottom-right-radius: 40px;
+      margin-bottom: 2rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+
+    .app-title {
+      font-size: 2rem;
+      font-weight: 800;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .app-title i {
+      font-size: 1.8rem;
+    }
+
+    .mood-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-radius: 24px;
+      padding: 2rem;
+      margin: 1.5rem 5%;
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      box-shadow: var(--card-shadow);
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .mood-card h3 {
+      font-size: 1.3rem;
+      color: var(--primary-dark);
+      margin-bottom: 1rem;
+      font-weight: 600;
+    }
+
+    #currentMoodDisplay {
+      font-size: 2rem;
+      font-weight: 700;
+      padding: 1rem 2rem;
+      background: linear-gradient(135deg, rgba(94, 96, 206, 0.1), rgba(116, 0, 184, 0.1));
+      border-radius: 50px;
+      margin-top: 0.5rem;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    }
+
+    .search-container {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      max-width: 90%;
+      margin: 2rem auto;
+      position: relative;
+    }
+
+    .search-container input {
+      background: var(--card-bg);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      font-size: 1rem;
+      padding: 1rem 1.5rem;
+      border-radius: 50px;
+      width: 100%;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    }
+
+    .search-container input:focus {
+      outline: none;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+      border-color: var(--primary);
+    }
+
+    .search-container button {
+      background: var(--primary);
+      color: var(--text-light);
+      border: none;
+      padding: 1rem 1.5rem;
+      border-radius: 50px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .search-container button:hover {
+      background: var(--primary-dark);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    }
+
+    .mood-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1rem;
+      margin: 2rem 5%;
+    }
+
+    .mood-button {
+      background: var(--card-bg);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      color: var(--primary-dark);
+      padding: 1rem 0.5rem;
+      border-radius: 20px;
+      font-size: 1rem;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .mood-button i {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .mood-button:hover {
+      background: var(--primary);
+      color: var(--text-light);
+      transform: translateY(-5px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    }
+
+    #results {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
+      padding: 1rem 5% 6rem;
+    }
+
+    .song {
+      background: var(--card-bg);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-radius: 24px;
+      padding: 1.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      box-shadow: var(--card-shadow);
+      transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .song.loading-animation {
+      animation: fadeIn 0.5s ease forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .song:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    }
+
+    .song-info {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      align-items: center;
+    }
+
+    .song-artwork {
+      width: 200px;
+      height: 200px;
+      border-radius: 20px;
+      object-fit: cover;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+      transition: all 0.3s ease;
+      cursor: pointer;
+      transform: perspective(800px) rotateY(0deg);
+    }
+
+    .song-artwork:hover {
+      transform: perspective(800px) rotateY(5deg);
+      box-shadow: -10px 8px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .song-details {
+      width: 100%;
+      text-align: center;
+    }
+
+    .song-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--text-dark);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .song-artist {
+      font-size: 1rem;
+      color: var(--text-dark);
+      opacity: 0.8;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .song-meta {
+      font-size: 0.85rem;
+      color: var(--text-dark);
+      opacity: 0.6;
+      line-height: 1.5;
+    }
+
+    .custom-player {
+      margin-top: 1.5rem;
+      width: 100%;
+      position: relative;
+    }
+
+    .player-controls {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .play-btn {
+      background: var(--primary);
+      color: var(--text-light);
+      border: none;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+      flex-shrink: 0;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .play-btn:hover {
+      background: var(--primary-dark);
+      transform: scale(1.05);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .play-btn svg {
+      width: 24px;
+      height: 24px;
+      fill: var(--text-light);
+    }
+
+    .progress-bar {
+      flex: 1;
+      height: 6px;
+      background: rgba(0, 0, 0, 0.1);
+      border-radius: 3px;
+      position: relative;
+      cursor: pointer;
+    }
+
+    .progress {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      background: var(--primary);
+      border-radius: 3px;
+      transition: width 0.1s linear;
+    }
+
+    .time-display {
+      font-size: 0.85rem;
+      color: var(--text-dark);
+      opacity: 0.8;
+      width: 40px;
+      text-align: right;
+    }
+
+    .volume-control {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .volume-slider {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 4px;
+      background: rgba(0, 0, 0, 0.1);
+      border-radius: 2px;
+      outline: none;
+    }
+
+    .volume-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--primary);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .volume-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    .volume-slider::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--primary);
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+    }
+
+    .volume-slider::-moz-range-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    .mini-player {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: var(--card-bg);
+      backdrop-filter: blur(30px);
+      -webkit-backdrop-filter: blur(30px);
+      border-radius: 50px;
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      z-index: 1000;
+      width: fit-content;
+      max-width: 90%;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .mini-player.visible {
+      opacity: 1;
+      pointer-events: all;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .mini-player img {
+      width: 50px;
+      height: 50px;
+      border-radius: 12px;
+      object-fit: cover;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .mini-player-info {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .mini-player .song-title {
+      font-size: 1rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin: 0;
+      text-align: left;
+      justify-content: flex-start;
+    }
+
+    .mini-player .song-artist {
+      font-size: 0.85rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin: 0;
+      text-align: left;
+      justify-content: flex-start;
+    }
+
+    .mini-player .play-btn {
+      width: 40px;
+      height: 40px;
+    }
+
+    .mini-player .play-btn svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .no-results {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 2rem;
+      font-size: 1.1rem;
+      color: var(--text-dark);
+      opacity: 0.7;
+    }
+
+    @media (max-width: 768px) {
+      .app-title {
+        font-size: 1.8rem;
+      }
+
+      .mini-player {
+        bottom: 20px;
+      }
+
+      #results {
+        grid-template-columns: 1fr;
+        padding: 0.5rem 5% 6rem;
+        gap: 1.5rem;
+      }
+
+      .song-artwork {
+        width: 180px;
+        height: 180px;
+      }
+
+      .mood-container {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.75rem;
+      }
+
+      .mood-button {
+        padding: 0.75rem 0.5rem;
+        font-size: 0.9rem;
+      }
+
+      .mood-button i {
+        font-size: 1.3rem;
+      }
+
+      .song {
+        padding: 1.25rem;
+      }
+
+      .detection-title {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+      }
+
+      .face-container {
+        width: 280px;
+        height: 280px;
+      }
+
+      .face-scan {
+        width: 240px;
+        height: 240px;
+      }
+
+      #video {
+        width: 220px;
+        height: 220px;
+      }
+    }
+
+    @media (min-width: 769px) and (max-width: 1200px) {
+      #results {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (min-width: 1201px) {
+      #results {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    /* Theme Toggle */
+    .theme-toggle {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text-light);
+      font-size: 1.2rem;
+      transition: all 0.3s ease;
+    }
+
+    .theme-toggle:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-2px);
+    }
+
+    /* Dark Theme */
+    body.dark-theme {
+      background: linear-gradient(135deg, #121212 0%, #1E1E1E 100%);
+      color: var(--text-light);
+    }
+
+    body.dark-theme .main-app {
+      background: linear-gradient(135deg, #121212 0%, #1E1E1E 100%);
+    }
+
+    body.dark-theme .song,
+    body.dark-theme .mood-card,
+    body.dark-theme .mood-button,
+    body.dark-theme .search-container input,
+    body.dark-theme .mini-player {
+      background: rgba(30, 30, 30, 0.9);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    body.dark-theme .song-title,
+    body.dark-theme .song-artist,
+    body.dark-theme .song-meta,
+    body.dark-theme .time-display,
+    body.dark-theme .mood-card h3 {
+      color: var(--text-light);
+    }
+
+    body.dark-theme .progress-bar,
+    body.dark-theme .volume-slider {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    body.dark-theme .mood-button {
+      color: var(--accent-light);
+    }
+
+    body.dark-theme .search-container input {
+      color: var(--text-light);
+    }
+
+    body.dark-theme .search-container input::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <div class="detection-phase" id="detectionPhase">
+    <h2 class="detection-title">AI Mood Detection</h2>
+    <button onclick="switchCamera()" class="camera-btn">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+        <path d="M9 3L7.17 5H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2h-3.17L15 3H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
+        <path d="M12 17l1.25-2.75L16 13l-2.75-1.25L12 9l-1.25 2.75L8 13l2.75 1.25z" />
+      </svg>
+    </button>
+    <div class="face-container">
+      <div class="face-scan">
+        <div class="scan-line"></div>
+        <div class="scan-dots"></div>
+      </div>
+      <video id="video" autoplay muted></video>
+    </div>
+    <div class="detection-status" id="mood-display">
+      <div class="loading">Initializing Face Detection</div>
+    </div>
+  </div>
+
+  <div class="main-app" id="mainApp">
+    <div class="mini-player" id="miniPlayer">
+      <div class="mini-player-info">
+        <div id="miniPlayerTitle"></div>
+        <div id="miniPlayerArtist"></div>
+      </div>
+      <button class="play-btn" onclick="toggleMiniPlayer(this)">
+        <svg viewBox="0 0 24 24" width="16" height="16">
+          <path d="M8 5v14l11-7z" fill="currentColor"/>
+        </svg>
+      </button>
+    </div>
+    <h1>Your Music Mood</h1>
+    
+    <div class="mood-card">
+      <h3>Current Mood</h3>
+      <div id="currentMoodDisplay"></div>
+    </div>
+
+    <div class="search-container">
+      <input type="text" id="searchInput" placeholder="Search any song, artist, or mood...">
+      <button onclick="searchSong()">Search</button>
+    </div>
+
+    <div class="mood-container">
+      <button class="mood-button" onclick="searchByMood('Happy')">😊 Happy</button>
+      <button class="mood-button" onclick="searchByMood('Sad')">😢 Sad</button>
+      <button class="mood-button" onclick="searchByMood('Energetic')">⚡ Energetic</button>
+      <button class="mood-button" onclick="searchByMood('Calm')">😌 Calm</button>
+      <button class="mood-button" onclick="searchByMood('Romantic')">❤️ Romantic</button>
+      <button class="mood-button" onclick="searchByMood('Party')">🎉 Party</button>
+    </div>
+
+    <div id="results"></div>
+  </div>
+
+  <script>
+    let currentMood = '';
+    let currentFacingMode = "user";
+    let stream;
+    let moodDetected = false;
+    let detectInterval;
+    let lastMood = '';
+    let searchTimeout = null;
+    let isSearching = false;
+    let continueDetection = true;
+
+    const video = document.getElementById("video");
+    const moodDisplay = document.getElementById("mood-display");
+    const detectionPhase = document.getElementById("detectionPhase");
+    const mainApp = document.getElementById("mainApp");
+
+    async function startAI() {
+      try {
+        moodDisplay.innerHTML = '<div class="loading">Loading AI models</div>';
+        const modelURL = 'https://justadudewhohacks.github.io/face-api.js/models';
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(modelURL),
+          faceapi.nets.faceExpressionNet.loadFromUri(modelURL)
+        ]);
+        moodDisplay.innerHTML = '<div class="loading">Starting camera</div>';
+        await startCamera();
+        moodDisplay.innerHTML = '<div class="loading">Position your face in the circle</div>';
+      } catch (error) {
+        moodDisplay.innerHTML = 'Error loading AI. Please refresh the page.';
+        console.error(error);
+      }
+    }
+
+    async function startCamera() {
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+      }
+      
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            facingMode: currentFacingMode,
+            width: { ideal: 320 },
+            height: { ideal: 240 }
+          } 
+        });
+        video.srcObject = stream;
+        
+        // Wait for video to be ready
+        await new Promise(resolve => video.addEventListener('play', resolve));
+        startDetection();
+      } catch (error) {
+        moodDisplay.innerHTML = 'Camera access denied. Please allow camera access.';
+        console.error(error);
+      }
+    }
+
+    function switchCamera() {
+      currentFacingMode = currentFacingMode === "user" ? "environment" : "user";
+      startCamera();
+    }
+
+    function startDetection() {
+      if (detectInterval) clearInterval(detectInterval);
+      
+      detectInterval = setInterval(async () => {
+        try {
+          if (!continueDetection) {
+            clearInterval(detectInterval);
+            return;
+          }
+
+          const result = await faceapi
+            .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.3 }))
+            .withFaceExpressions();
+          
+          if (result?.expressions) {
+            // Log detected expressions for debugging
+            console.log("Detected expressions:", result.expressions);
+            
+            // Get all expressions above minimum threshold
+            const significantExpressions = Object.entries(result.expressions)
+              .filter(([_, value]) => value > 0.1)
+              .sort((a, b) => b[1] - a[1]);
+            
+            console.log("Significant expressions:", significantExpressions);
+            
+            // Get top expression
+            const mood = significantExpressions.length > 0 ? 
+              significantExpressions[0][0] : 'neutral';
+            
+            moodDisplay.innerHTML = `
+              <div class="loading" style="color: var(--accent-light)">
+                Face Detected - Analyzing Mood (${mood})
+              </div>`;
+            
+            if (!moodDetected) {
+              await wait(1000);
+              moodDetected = true;
+              cleanupCamera();
+              revealMainApp(mood);
+            }
+          } else {
+            moodDisplay.innerHTML = `
+              <div class="loading">
+                Position your face in the circle
+              </div>`;
+          }
+        } catch (error) {
+          console.error('Detection error:', error);
+        }
+      }, 500);
+    }
+
+    function cleanupCamera() {
+      continueDetection = false;
+      if (detectInterval) {
+        clearInterval(detectInterval);
+      }
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    }
+
+    function wait(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function revealMainApp(mood) {
+      detectionPhase.classList.add('hidden');
+      setTimeout(() => {
+        mainApp.classList.add('visible');
+        updateMoodDisplay(mood);
+        searchByMood(convertMoodToCategory(mood));
+      }, 100);
+    }
+
+    function updateMoodDisplay(mood) {
+      const formattedMood = mood.charAt(0).toUpperCase() + mood.slice(1);
+      const emoji = getMoodEmoji(mood);
+      
+      document.getElementById('currentMoodDisplay').innerHTML = `
+        <div style="font-size: 1.5em; display: flex; align-items: center; justify-content: center; gap: 10px;">
+          <span style="font-size: 1.5em;">${emoji}</span>
+          <span>${formattedMood}</span>
+        </div>
+      `;
+    }
+
+    function getMoodEmoji(mood) {
+      const emojis = {
+        happy: '😊',
+        sad: '😢',
+        angry: '😠',
+        neutral: '😐',
+        surprised: '😲',
+        disgusted: '🤢',
+        fearful: '😨'
+      };
+      return emojis[mood.toLowerCase()] || '😐';
+    }
+
+    function convertMoodToCategory(mood) {
+      const moodMap = {
+        'happy': 'Happy',
+        'sad': 'Sad',
+        'angry': 'Energetic',
+        'neutral': 'Calm',
+        'surprised': 'Party',
+        'disgusted': 'Party',
+        'fearful': 'Calm'
+      };
+      return moodMap[mood.toLowerCase()] || 'Calm';
+    }
+
+    function searchSong() {
+      const query = document.getElementById('searchInput').value.trim();
+      if (query) {
+        fetchSongs(query);
+      }
+    }
+
+    function searchByMood(mood) {
+      if (!mood) return;
+      const moodMappings = {
+        'Happy': 'tamil happy songs',
+        'Sad': 'tamil sad songs',
+        'Energetic': 'tamil dance songs',
+        'Calm': 'tamil melody songs',
+        'Romantic': 'tamil love songs',
+        'Party': 'tamil party songs'
+      };
+      document.getElementById('searchInput').value = moodMappings[mood];
+      fetchSongs(moodMappings[mood]);
+    }
+
+    async function fetchSongs(query) {
+      if (isSearching) return;
+      isSearching = true;
+      
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = `<p>Finding Tamil songs for "${query}"...</p>`;
+
+      // Add Tamil specific search
+      const tamilQuery = `tamil ${query}`;
+      const apiUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(tamilQuery)}&media=music&limit=50&country=IN`;
+
+      try {
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+        
+        resultsDiv.innerHTML = '';
+
+        // Check if data and results exist
+        if (!data || !data.results || !Array.isArray(data.results)) {
+          resultsDiv.innerHTML = '<p>No songs found. Please try again.</p>';
+          return;
+        }
+
+        // Enhanced Tamil song filtering with null checks
+        const tamilSongs = data.results.filter(track => {
+          if (!track) return false;
+          
+          const trackInfo = [
+            track.trackName || '',
+            track.artistName || '',
+            track.collectionName || '',
+            track.primaryGenreName || ''
+          ].map(str => str.toLowerCase());
+
+          const hasYearPattern = /^(19|20)\d{2}$/;  // To exclude just years
+          if (trackInfo.some(info => hasYearPattern.test(info))) return false;
+
+          return trackInfo.some(info => 
+            info.includes('tamil') ||
+            info.includes('kollywood') ||
+            info.includes('paatu') ||
+            info.includes('gaana') ||
+            info.includes('kuthu') ||
+            info.includes('ar rahman') ||
+            info.includes('anirudh') ||
+            info.includes('ilayaraja') ||
+            info.includes('harris jayaraj') ||
+            info.includes('yuvan') ||
+            info.includes('spb') ||
+            info.includes('balasubrahmanyam')
+          );
+        });
+
+        if (tamilSongs.length === 0) {
+          resultsDiv.innerHTML = '<p>No Tamil songs found. Try a different search.</p>';
+          return;
+        }
+
+        // Rest of the existing code for rendering songs...
+        tamilSongs.slice(0, 10).forEach((track, index) => {
+          const songDiv = document.createElement('div');
+          songDiv.className = 'song loading-animation';
+          songDiv.style.animationDelay = `${index * 0.1}s`;
+          
+          const youtubeQuery = `${track.artistName} ${track.trackName}`.replace(/[^\w\s]/g, '');
+          
+          songDiv.innerHTML = `
+            <div class="song-info">
+              <img src="${track.artworkUrl100.replace('100x100', '300x300')}" alt="Artwork"
+                   onclick="window.open('https://www.youtube.com/results?search_query=${encodeURIComponent(youtubeQuery)}', '_blank')">
+              <div class="song-details">
+                <h3 class="song-title">🎵 ${track.trackName}</h3>
+                <p class="song-artist">👤 ${track.artistName}</p>
+                <p class="song-meta">
+                  💿 ${track.collectionName || 'Unknown Album'}
+                </p>
+              </div>
+            </div>
+            <div class="custom-player">
+              <div class="player-controls">
+                <button class="play-btn" onclick="togglePlay(this)">
+                  <svg viewBox="0 0 24 24" width="24" height="24">
+                    <path d="M8 5v14l11-7z" fill="currentColor"/>
+                  </svg>
+                </button>
+                <div class="progress-bar">
+                  <div class="progress" style="width: 0%"></div>
+                </div>
+                <span class="time-display">0:00</span>
+              </div>
+              <div class="volume-control">
+                <span>🔊</span>
+                <input type="range" class="volume-slider" min="0" max="1" step="0.1" value="1">
+              </div>
+              <audio src="${track.previewUrl}"></audio>
+            </div>
+          `;
+
+          const audio = songDiv.querySelector('audio');
+          const progressBar = songDiv.querySelector('.progress');
+          const timeDisplay = songDiv.querySelector('.time-display');
+          const volumeSlider = songDiv.querySelector('.volume-slider');
+
+          audio.addEventListener('timeupdate', () => {
+            const progress = (audio.currentTime / audio.duration) * 100;
+            progressBar.style.width = progress + '%';
+            timeDisplay.textContent = formatTime(audio.currentTime);
+          });
+
+          songDiv.querySelector('.progress-bar').addEventListener('click', (e) => {
+            const rect = e.target.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const width = rect.width;
+            const percentage = x / width;
+            audio.currentTime = percentage * audio.duration;
+          });
+
+          volumeSlider.addEventListener('input', (e) => {
+            audio.volume = e.target.value;
+          });
+          
+          resultsDiv.appendChild(songDiv);
+        });
+
+      } catch (error) {
+        resultsDiv.innerHTML = '<p>Something went wrong. Please try again later.</p>';
+        console.error(error);
+      } finally {
+        isSearching = false;
+      }
+    }
+
+    function togglePlay(btn) {
+      const audio = btn.closest('.custom-player').querySelector('audio');
+      const songInfo = btn.closest('.song');
+      const miniPlayer = document.getElementById('miniPlayer');
+      
+      if (audio.paused) {
+        document.querySelectorAll('audio').forEach(a => {
+          if (a !== audio) {
+            a.pause();
+            updatePlayButton(a, true);
+          }
+        });
+        audio.play();
+        updatePlayButton(btn, false);
+        updateMiniPlayer(songInfo, true);
+      } else {
+        audio.pause();
+        updatePlayButton(btn, true);
+        updateMiniPlayer(songInfo, false);
+      }
+    }
+
+    function updatePlayButton(btn, paused) {
+      btn.innerHTML = paused ? 
+        '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>' :
+        '<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
+    }
+
+    function updateMiniPlayer(songInfo, playing) {
+      const miniPlayer = document.getElementById('miniPlayer');
+      const title = songInfo.querySelector('.song-title').textContent.replace('🎵 ', '');
+      const artist = songInfo.querySelector('.song-artist').textContent.replace('👤 ', '');
+
+      document.getElementById('miniPlayerTitle').textContent = title;
+      document.getElementById('miniPlayerArtist').textContent = artist;
+
+      if (playing) {
+        miniPlayer.classList.add('visible');
+      } else {
+        miniPlayer.classList.remove('visible');
+      }
+    }
+
+    function toggleMiniPlayer(btn) {
+      const currentlyPlaying = document.querySelector('audio:not([paused])');
+      if (currentlyPlaying) {
+        const songContainer = currentlyPlaying.closest('.song');
+        const mainPlayBtn = songContainer.querySelector('.play-btn');
+        togglePlay(mainPlayBtn);
+      }
+    }
+
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    window.addEventListener('load', startAI);
+  </script>
+</body>
+</html>
