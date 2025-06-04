@@ -1,33 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Open App</title>
   <style>
     body {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
       font-family: Arial, sans-serif;
+      background: #f0f0f0;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
     }
-    a {
-      padding: 15px 25px;
+    a.button {
+      display: inline-block;
+      padding: 15px 30px;
       background-color: #007bff;
       color: white;
       text-decoration: none;
-      border-radius: 8px;
+      border-radius: 10px;
       font-size: 18px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }
-    a:hover {
+    a.button:hover {
       background-color: #0056b3;
+    }
+    .note {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #666;
     }
   </style>
 </head>
 <body>
-  <a href="intent://#Intent;package=com.ddroid.opn;scheme=package;end">
-    Click to Open the App
-  </a>
+
+  <div>
+    <a class="button" href="intent://#Intent;package=com.ddroid.opn;end">
+      Click to Open the App
+    </a>
+    <p class="note">
+      Works only on Android devices with the app installed.
+    </p>
+  </div>
+
 </body>
 </html>
